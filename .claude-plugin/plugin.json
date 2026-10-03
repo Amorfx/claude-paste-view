@@ -1,0 +1,14 @@
+{
+  "name": "paste-view",
+  "description": "See what you paste into Claude Code: image thumbnails and long-text previews above the prompt instead of bare [Image #1] and [Pasted text #2] tags",
+  "version": "0.1.0",
+  "author": {
+    "name": "Clément Décou",
+    "url": "https://github.com/Amorfx"
+  },
+  "homepage": "https://github.com/Amorfx/claude-paste-view",
+  "repository": "https://github.com/Amorfx/claude-paste-view",
+  "license": "MIT",
+  "keywords": ["paste", "preview", "images", "text", "thumbnails", "mod", "terminal", "claude-code"],
+  "types": "./types/index.d.ts"
+}

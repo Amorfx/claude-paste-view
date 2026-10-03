@@ -1,0 +1,19 @@
+{
+  "name": "claude-paste-view",
+  "owner": {
+    "name": "Clément Décou",
+    "url": "https://github.com/Amorfx"
+  },
+  "plugins": [
+    {
+      "name": "paste-view",
+      "source": "./",
+      "description": "See what you paste into Claude Code: image thumbnails and long-text previews above the prompt",
+      "category": "productivity",
+      "tags": ["paste", "preview", "images", "text", "thumbnails", "mod", "terminal"]
+    }
+  ],
+  "metadata": {
+    "description": "See what you paste into Claude Code"
+  }
+}
