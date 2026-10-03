@@ -2,6 +2,8 @@
 
 A Claude Code mod that shows what you paste, so you see image thumbnails and a preview of long text above your prompt instead of bare `[Image #1]` and `[Pasted text #2 +41 lines]` tags.
 
+![A pasted screenshot shown as a thumbnail and a pasted text as a one-line preview, above the prompt](docs/preview.png)
+
 ## Install
 
 Inside Claude Code, run:
@@ -40,6 +42,8 @@ click a paste, or ctrl+x tab then its number, to read it whole
 - **Long text** shows as one line: its line count, its size and its first line.
 - **See a paste whole** by clicking its line, or with ctrl+x tab then its number. Text opens in a pane (↑↓ to scroll, Esc to close); an image opens in your system's viewer. Your draft is left as it is.
 - **Clears on send.** Once the prompt is sent, or a tag is deleted, its preview goes away.
+
+![A pasted text opened whole in a pane, with its line and character counts](docs/pane.png)
 
 ## How It Works
 
