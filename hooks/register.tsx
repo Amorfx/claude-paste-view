@@ -34,6 +34,8 @@ const dimensions = new Map<string, Dimensions | null>()
 const pastes = new Map<number, string | null>()
 // What the draft held at the last refresh; undefined forces the next one to redo the work.
 let lastSignature: string | undefined
+// What was last written to state, so a refresh that finds the same pastes doesn't redraw.
+let written: string | undefined
 let isRefreshing = false
 
 async function tmpRoot($: EngineInterface): Promise<string> {
@@ -43,7 +45,7 @@ async function tmpRoot($: EngineInterface): Promise<string> {
   return `/tmp/claude-${stdout.trim()}`
 }
 
-// Claude Code keeps a session's pasted images in <tmp>/<project>/<session>/images/<n>.png,
+// Claude Code keeps a session's pasted images in <tmp>/<project>/<session>/images/<n>.<ext>,
 // <project> being the working directory with every character but letters and digits
 // turned into '-'. That folder is tried first; the session id alone finds it otherwise.
 async function findImagesDir($: EngineInterface): Promise<string | undefined> {
@@ -65,9 +67,22 @@ async function findImagesDir($: EngineInterface): Promise<string | undefined> {
   return undefined
 }
 
+// An image is cached in the format it was pasted in: <n>.png for a screenshot, but
+// <n>.jpg or <n>.webp for others.
+async function findImage($: EngineInterface, dir: string, n: number): Promise<string | undefined> {
+  const png = `${dir}/${n}.png`
+  if (await $.fs.exists(png)) return png
+  const entries = await $.fs.list(dir).catch(() => [])
+  const other = entries.find(entry => entry.kind === 'file' && entry.name.startsWith(`${n}.`))
+  return other === undefined ? undefined : `${dir}/${other.name}`
+}
+
+const isPng = (path: string) => path.endsWith('.png')
+
 async function describeImage($: EngineInterface, dir: string | undefined, n: number): Promise<PastedImage> {
-  const path = dir === undefined ? undefined : `${dir}/${n}.png`
-  if (path === undefined || !(await $.fs.exists(path))) return { n, path: null, size: null }
+  const path = dir === undefined ? undefined : await findImage($, dir, n)
+  if (path === undefined) return { n, path: null, size: null }
+  if (!isPng(path)) return { n, path, size: null }
   if (!dimensions.has(path)) {
     // A file past the read cap is still drawn, in a default shape.
     const head = await $.fs.read(path, { as: 'bytes' }).catch(() => undefined)
@@ -112,8 +127,14 @@ async function refresh($: EngineInterface, draft: string) {
   // An image whose file hasn't landed yet is looked for again on the next poll.
   lastSignature = imageList.some(image => image.path === null) ? undefined : signature
 
-  await update($, images, () => imageList)
-  await update($, texts, () => tags.texts.map(tag => ({ ...tag, text: pastes.get(tag.n) ?? null })))
+  const textList = tags.texts.map(tag => ({ ...tag, text: pastes.get(tag.n) ?? null }))
+  // Each write redraws the band: an image still missing must not redraw it on every poll.
+  const json = JSON.stringify([imageList, textList])
+  if (json !== written) {
+    await update($, images, () => imageList)
+    await update($, texts, () => textList)
+    written = json
+  }
 
   const shown = await read($, viewing)
   if (shown !== null && !tags.texts.some(tag => tag.n === shown)) await closePane($)
@@ -150,8 +171,10 @@ async function closePane($: EngineInterface) {
 const shownLines = (paste: PastedText) =>
   paste.text === null ? (paste.lines ?? 0) + 1 : lineBreaks(paste.text.trimEnd()) + 1
 
-const imageLabel = (image: PastedImage) =>
-  `#${image.n} · image${image.size === null ? '' : ` ${image.size.width}×${image.size.height}`}`
+const imageLabel = (image: PastedImage, path: string) => {
+  if (image.size !== null) return `#${image.n} · image ${image.size.width}×${image.size.height}`
+  return isPng(path) ? `#${image.n} · image` : `#${image.n} · image · ${path.slice(path.lastIndexOf('.') + 1)}`
+}
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
@@ -160,6 +183,9 @@ export const register: Register = on => {
       term: await $.env.get('TERM'),
       termProgram: await $.env.get('TERM_PROGRAM'),
       kittyWindowId: await $.env.get('KITTY_WINDOW_ID'),
+      forceImages: await $.env.get('CLAUDE_CODE_FORCE_TERMINAL_IMAGES'),
+      sessionKind: await $.env.get('CLAUDE_CODE_SESSION_KIND'),
+      multiplexer: (await $.env.get('TMUX')) ?? (await $.env.get('STY')),
     })
     // A reload keeps the state: the texts already read stay matched to their tags.
     for (const paste of await read($, texts)) pastes.set(paste.n, paste.text)
@@ -180,9 +206,10 @@ export const register: Register = on => {
 
     const { Box, Button, Image, Text } = $.ui.resolve(e)
     const width = e.props.bodyColumns
-    const pictures = hasGraphics ? imageList.filter(image => image.path !== null) : []
+    // The Image element draws a PNG file only: any other format is a line that opens it.
+    const pictures = hasGraphics ? imageList.filter(image => image.path !== null && isPng(image.path)) : []
     const imageLines = imageList.filter(image => !pictures.includes(image))
-    const openable = imageLines.filter(image => !hasGraphics && image.path !== null)
+    const openable = imageLines.filter(image => image.path !== null)
     // One row per line below the thumbnails, plus the hint; the thumbnails get the rest.
     const lineRows = imageLines.length + textList.length + 1
     const boxes = thumbnailBoxes(pictures.map(image => image.size), e.props.maxRows - lineRows, width)
@@ -193,7 +220,7 @@ export const register: Register = on => {
     return (
       <Box flexDirection="column">
         {pictures.length > 0 && (
-          <Box flexDirection="row" columnGap={1}>
+          <Box flexDirection="row" columnGap={1} alignItems="flex-end">
             {pictures.map((image, i) => (
               <Box flexDirection="column" alignItems="center">
                 <Box borderStyle="round" borderDimColor>
@@ -212,7 +239,7 @@ export const register: Register = on => {
         )}
         {imageLines.map(image => {
           const path = image.path
-          if (path === null || hasGraphics) {
+          if (path === null) {
             return <Text dimColor wrap="truncate">{`#${image.n} · image · no preview`}</Text>
           }
           return (
@@ -220,7 +247,7 @@ export const register: Register = on => {
               key={`image-${image.n}`}
               plain
               {...hotkey(openable.indexOf(image))}
-              label={`${imageLabel(image)} — open`}
+              label={`${imageLabel(image, path)} — open`}
               onPress={() => openImage($, path)}
             />
           )

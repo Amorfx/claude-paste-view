@@ -61,11 +61,27 @@ export function thumbnailBoxes(sizes: readonly (Dimensions | null)[], maxRows: n
   return boxes
 }
 
+export type TerminalEnv = {
+  term?: string
+  termProgram?: string
+  kittyWindowId?: string
+  /** CLAUDE_CODE_FORCE_TERMINAL_IMAGES */
+  forceImages?: string
+  /** CLAUDE_CODE_SESSION_KIND */
+  sessionKind?: string
+  /** TMUX or STY, set inside tmux or screen */
+  multiplexer?: string
+}
+
 /**
  * Whether the terminal draws Claude Code's `Image` element, which needs the kitty
- * graphics protocol (kitty, Ghostty); elsewhere it only draws the `alt` text.
+ * graphics protocol (kitty, Ghostty); elsewhere it only draws the `alt` text. Claude Code
+ * itself turns pictures off in background sessions and inside tmux or screen, unless
+ * CLAUDE_CODE_FORCE_TERMINAL_IMAGES is set.
  */
-export function drawsImages(env: { term?: string; termProgram?: string; kittyWindowId?: string }): boolean {
+export function drawsImages(env: TerminalEnv): boolean {
+  if (env.forceImages) return true
+  if (env.sessionKind === 'bg' || env.multiplexer) return false
   const term = env.term?.toLowerCase() ?? ''
   return (
     env.kittyWindowId !== undefined ||
