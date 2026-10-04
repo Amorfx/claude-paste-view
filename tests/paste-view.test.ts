@@ -117,6 +117,7 @@ function harness(on: On, env: Record<string, string> = {}) {
   const state = {
     draft: '',
     clipboard: '',
+    hasClipboardTool: true,
     /** Names of the files in the session's image cache. */
     images: ['1.png'],
     writes: 0,
@@ -138,7 +139,7 @@ function harness(on: On, env: Record<string, string> = {}) {
     state.ran.push([...e.argv])
     const [command] = e.argv
     const stdout = command === 'pbpaste' ? state.clipboard : command === 'uname' ? 'Darwin\n' : ''
-    const exitCode = command === 'pbpaste' || command === 'uname' || command === 'open' ? 0 : 1
+    const exitCode = (command === 'pbpaste' && state.hasClipboardTool) || command === 'uname' || command === 'open' ? 0 : 1
     return { value: { exitCode, stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
   })
   on('ui.open', ($, e) => (state.opened.push(e.id), { value: { isPlaced: true } }))
@@ -189,6 +190,20 @@ test('a paste whose clipboard no longer matches says so instead of guessing', as
   const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
   expect(await band.find({ type: 'Button' })).toBeUndefined()
   expect(await band.find({ type: 'Text', text: '#1 · 10 lines · no preview (clipboard changed)' })).toBeDefined()
+})
+
+test('a system with no clipboard tool says what to install instead of blaming the clipboard', async ($, on) => {
+  const { clock, state } = harness(on)
+  state.hasClipboardTool = false
+  await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+
+  state.draft = '[Pasted text #1 +2 lines]'
+  await clock.advance(200)
+
+  const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  expect(
+    await band.find({ type: 'Text', text: "#1 · 3 lines · no preview (couldn't read the clipboard: install wl-clipboard or xclip)" }),
+  ).toBeDefined()
 })
 
 test('several tags appearing at once are not guessed from one clipboard', async ($, on) => {

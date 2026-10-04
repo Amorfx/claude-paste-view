@@ -255,7 +255,10 @@ export const register: Register = on => {
         {textList.map((paste, i) => {
           const head = `#${paste.n} · ${shownLines(paste)} lines`
           if (paste.text === null) {
-            return <Text dimColor wrap="truncate">{`${head} · no preview (clipboard changed)`}</Text>
+            // No clipboard tool ran at all: say what to install rather than blame the clipboard.
+            const reason =
+              clipboardCommand === null ? "couldn't read the clipboard: install wl-clipboard or xclip" : 'clipboard changed'
+            return <Text dimColor wrap="truncate">{`${head} · no preview (${reason})`}</Text>
           }
           const label = `${head} · ${charCount(paste.text.length)} — `
           // The hotkey prefix (`1: `) takes three cells.

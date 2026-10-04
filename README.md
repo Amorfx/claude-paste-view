@@ -26,6 +26,12 @@ Then run `/reload-plugins` inside a session, or start a new one.
 
 </details>
 
+On Linux, text previews read the clipboard with `wl-paste` or `xclip`, which most distributions don't install by default:
+
+```bash
+sudo apt install wl-clipboard xclip   # Debian, Ubuntu
+```
+
 ## What You See
 
 ```
