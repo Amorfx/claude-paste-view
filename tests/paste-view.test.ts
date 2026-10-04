@@ -47,6 +47,11 @@ test('pictures are drawn only where the terminal speaks the kitty graphics proto
   expect(drawsImages({ term: 'xterm-256color', termProgram: 'Orca' })).toBe(false)
   expect(drawsImages({ term: 'xterm-256color', termProgram: 'Apple_Terminal' })).toBe(false)
   expect(drawsImages({})).toBe(false)
+  // Claude Code turns pictures off inside tmux or screen and in background sessions...
+  expect(drawsImages({ termProgram: 'ghostty', multiplexer: '/tmp/tmux-501/default,1,0' })).toBe(false)
+  expect(drawsImages({ termProgram: 'ghostty', sessionKind: 'bg' })).toBe(false)
+  // ...unless told to draw them anyway.
+  expect(drawsImages({ termProgram: 'ghostty', multiplexer: '1', forceImages: '1' })).toBe(true)
 })
 
 const BAND = {
@@ -109,11 +114,24 @@ const IMAGES_DIR = '/tmp/claude-501/-work/sess-1/images'
 function harness(on: On, env: Record<string, string> = {}) {
   const clock = mock.clock(on)
   mock.env(on, { CLAUDE_CODE_TMPDIR: '/tmp/claude-501', TERM: 'xterm-256color', ...env })
+  const state = {
+    draft: '',
+    clipboard: '',
+    /** Names of the files in the session's image cache. */
+    images: ['1.png'],
+    writes: 0,
+    opened: [] as string[],
+    closed: [] as string[],
+    ran: [] as string[][],
+  }
+  const entry = (name: string, kind: 'file' | 'dir') => ({ name, kind, size: 0, mtimeMs: 0, isLink: false })
   on('session.id', () => ({ value: 'sess-1' }))
-  on('fs.list', () => ({ value: [{ name: '-work', kind: 'dir', size: 0, mtimeMs: 0, isLink: false }] }))
-  on('fs.exists', ($, e) => ({ value: e.path === IMAGES_DIR || e.path === `${IMAGES_DIR}/1.png` }))
+  on('fs.list', ($, e) => ({
+    value: e.path === IMAGES_DIR ? state.images.map(name => entry(name, 'file')) : [entry('-work', 'dir')],
+  }))
+  on('fs.exists', ($, e) => ({ value: e.path === IMAGES_DIR || state.images.some(name => e.path === `${IMAGES_DIR}/${name}`) }))
   on('fs.read', () => ({ value: { base64: pngStart(800, 400) } }))
-  const state = { draft: '', clipboard: '', opened: [] as string[], closed: [] as string[], ran: [] as string[][] }
+  on('state.set', ($, e, next) => (state.writes++, next(e)))
   on('session.start', () => ({ cwd: '/work' }))
   on('prompt.read', () => ({ value: { text: state.draft, cursor: state.draft.length } }))
   on('process.run', ($, e) => {
@@ -211,3 +229,44 @@ for (const [terminal, env, hasPicture] of [
     }
   })
 }
+
+for (const [terminal, env] of [
+  ['Ghostty', { TERM_PROGRAM: 'ghostty' }],
+  ['Orca', { TERM_PROGRAM: 'Orca' }],
+] as const) {
+  test(`a pasted JPEG in ${terminal} shows as a line that opens it`, async ($, on) => {
+    const { clock, state } = harness(on, env)
+    state.images = ['1.jpg', '12.png']
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+
+    state.draft = 'see [Image #1]'
+    await clock.advance(200)
+
+    // The Image element only draws a PNG file, so no thumbnail, even where pictures show.
+    const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(await band.find({ type: 'Image' })).toBeUndefined()
+    expect(await band.find({ type: 'Button', key: 'image-1', text: '#1 · image · jpg — open' })).toBeDefined()
+    await $.ui.press({ plugin: 'paste-view', key: 'image-1' })
+    expect(state.ran).toContainEqual(['open', `${IMAGES_DIR}/1.jpg`])
+  })
+}
+
+test('an image whose file is still missing does not redraw the band on every poll', async ($, on) => {
+  const { clock, state } = harness(on, { TERM_PROGRAM: 'ghostty' })
+  state.images = []
+  await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+
+  state.draft = 'see [Image #1]'
+  await clock.advance(200)
+  const afterFirst = state.writes
+  await clock.advance(200)
+  await clock.advance(200)
+  expect(state.writes).toBe(afterFirst)
+
+  // Once its file lands, the next poll finds it and draws it.
+  state.images = ['1.png']
+  await clock.advance(200)
+  expect(state.writes).toBeGreaterThan(afterFirst)
+  const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  expect((await band.find({ type: 'Image' }))?.props).toMatchObject({ source: { file: `${IMAGES_DIR}/1.png` } })
+})
