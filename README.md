@@ -56,7 +56,7 @@ click a paste, or ctrl+x tab then its number, to read it whole
 - **Text previews come from the clipboard.** If the clipboard changes within ~200ms of pasting, or the paste didn't come from the clipboard (a tmux buffer, a remote session over SSH), the line reads `no preview` rather than showing the wrong text.
 - **A draft restored from history** with several text tags shows no text preview, since one clipboard can't stand for several pastes.
 - **No thumbnails inside tmux or screen, or in a background session** (agent view), even in Ghostty or kitty: Claude Code turns terminal pictures off there, and the mod lists images as lines instead. If your terminal speaks the kitty graphics protocol through them, add `"env": { "CLAUDE_CODE_FORCE_TERMINAL_IMAGES": "1" }` to `~/.claude/settings.json` and start a new session.
-- **iTerm2 isn't recognised** as a terminal that draws pictures, so images are listed as lines, although iTerm2 speaks the kitty graphics protocol. With the same `CLAUDE_CODE_FORCE_TERMINAL_IMAGES` setting, thumbnails draw in iTerm2 (seen with 3.7.3). The setting applies in every terminal you run Claude Code in, so leave it out if you also use one that can't draw pictures.
+- **iTerm2 isn't recognised** as a terminal that draws pictures, so images are listed as lines, although iTerm2 answers Claude Code's graphics probe. With `CLAUDE_CODE_FORCE_TERMINAL_IMAGES` set, thumbnails draw in iTerm2 (seen with 3.7.3). Set it for iTerm2 only, since a terminal that can't draw pictures would then show neither a thumbnail nor the `open` line: add `[ "$TERM_PROGRAM" = "iTerm.app" ] && export CLAUDE_CODE_FORCE_TERMINAL_IMAGES=1` to your shell profile (`~/.zshrc`, …), then start a new session.
 - **The tag formats and the image cache path are Claude Code internals.** A future version may change them; please open an issue if previews stop appearing.
 
 ## Security
@@ -69,7 +69,7 @@ Run `claude plugin validate .claude-plugin/plugin.json` on the repo to see every
 
 - Claude Code v2.1.287 or later (mods support)
 - macOS, or Linux with `wl-clipboard` or `xclip` for text previews
-- For image thumbnails, a terminal with the kitty graphics protocol, such as [Ghostty](https://ghostty.org) or [kitty](https://sw.kovidgoyal.net/kitty/), or iTerm2 with `CLAUDE_CODE_FORCE_TERMINAL_IMAGES` set (see [Limitations](#limitations)). The mod recognises them from `TERM`, `TERM_PROGRAM` and `KITTY_WINDOW_ID`; in any other terminal, or inside tmux, it lists images as lines that open them with `open` (macOS) or `xdg-open` (Linux).
+- For image thumbnails, a terminal with the kitty graphics protocol, such as [Ghostty](https://ghostty.org) or [kitty](https://sw.kovidgoyal.net/kitty/), or iTerm2 with `CLAUDE_CODE_FORCE_TERMINAL_IMAGES` set (see [Limitations](#limitations)). The mod recognises them from `TERM`, `TERM_PROGRAM` and `KITTY_WINDOW_ID`, or trusts `CLAUDE_CODE_FORCE_TERMINAL_IMAGES` when it is set; in any other terminal, or inside tmux, it lists images as lines that open them with `open` (macOS) or `xdg-open` (Linux).
 
 ## Development
 
