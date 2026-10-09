@@ -38,7 +38,7 @@ click a paste, or ctrl+x tab then its number, to read it whole
 ❯ why does this fail [Image #1] [Pasted text #2 +41 lines]
 ```
 
-- **Images** show as thumbnails that keep their shape and shrink to fit the space above the prompt. In a terminal that can't draw pictures (iTerm2, Terminal.app, …), each image is a line instead, `#1 · image 1630×632 — open`, that opens it in your system's image viewer. A pasted JPEG, WebP or other non-PNG image is always a line, `#1 · image · jpg — open`, since the terminal draws only PNG files.
+- **Images** show as thumbnails that keep their shape and shrink to fit the space above the prompt. In a terminal that can't draw pictures (Terminal.app, …), or that Claude Code doesn't recognise as one (iTerm2, see [Limitations](#limitations)), each image is a line instead, `#1 · image 1630×632 — open`, that opens it in your system's image viewer. A pasted JPEG, WebP or other non-PNG image is always a line, `#1 · image · jpg — open`, since the terminal draws only PNG files.
 - **Long text** shows as one line: its line count, its size and its first line.
 - **See a paste whole** by clicking its line, or with ctrl+x tab then its number. Text opens in a pane (↑↓ to scroll, Esc to close); an image opens in your system's viewer. Your draft is left as it is.
 - **Clears on send.** Once the prompt is sent, or a tag is deleted, its preview goes away.
@@ -56,6 +56,7 @@ click a paste, or ctrl+x tab then its number, to read it whole
 - **Text previews come from the clipboard.** If the clipboard changes within ~200ms of pasting, or the paste didn't come from the clipboard (a tmux buffer, a remote session over SSH), the line reads `no preview` rather than showing the wrong text.
 - **A draft restored from history** with several text tags shows no text preview, since one clipboard can't stand for several pastes.
 - **No thumbnails inside tmux or screen, or in a background session** (agent view), even in Ghostty or kitty: Claude Code turns terminal pictures off there, and the mod lists images as lines instead. If your terminal speaks the kitty graphics protocol through them, add `"env": { "CLAUDE_CODE_FORCE_TERMINAL_IMAGES": "1" }` to `~/.claude/settings.json` and start a new session.
+- **iTerm2 isn't recognised** as a terminal that draws pictures, so images are listed as lines, although iTerm2 speaks the kitty graphics protocol. With the same `CLAUDE_CODE_FORCE_TERMINAL_IMAGES` setting, thumbnails draw in iTerm2 (seen with 3.7.3). The setting applies in every terminal you run Claude Code in, so leave it out if you also use one that can't draw pictures.
 - **The tag formats and the image cache path are Claude Code internals.** A future version may change them; please open an issue if previews stop appearing.
 
 ## Security
@@ -68,7 +69,7 @@ Run `claude plugin validate .claude-plugin/plugin.json` on the repo to see every
 
 - Claude Code v2.1.287 or later (mods support)
 - macOS, or Linux with `wl-clipboard` or `xclip` for text previews
-- For image thumbnails, a terminal with the kitty graphics protocol, such as [Ghostty](https://ghostty.org) or [kitty](https://sw.kovidgoyal.net/kitty/). The mod recognises them from `TERM`, `TERM_PROGRAM` and `KITTY_WINDOW_ID`; in any other terminal, or inside tmux, it lists images as lines that open them with `open` (macOS) or `xdg-open` (Linux).
+- For image thumbnails, a terminal with the kitty graphics protocol, such as [Ghostty](https://ghostty.org) or [kitty](https://sw.kovidgoyal.net/kitty/), or iTerm2 with `CLAUDE_CODE_FORCE_TERMINAL_IMAGES` set (see [Limitations](#limitations)). The mod recognises them from `TERM`, `TERM_PROGRAM` and `KITTY_WINDOW_ID`; in any other terminal, or inside tmux, it lists images as lines that open them with `open` (macOS) or `xdg-open` (Linux).
 
 ## Development
 
